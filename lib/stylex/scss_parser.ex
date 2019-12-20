@@ -5,12 +5,36 @@ defmodule Stylex.ScssParser do
   transformation into the completed nodes
   """
 
+  @doc """
+  Adds the function `parse_scss/1` to the module its `use`-d into.
+
+
+  ```
+  defmodule Foo do
+    use Stylex.ScssParser, node_resolver: :foo
+
+    def foo(_, _, children), do: {"foo", children}
+
+    def run() do
+      s = \"\"\"
+      .container{background: red; &:before{content: '';}}
+      \"\"\"
+
+      parse_scss(s) # => {"foo", [{"foo", []}]}
+    end
+  end
+  ```
+
+  See `parse/2` for more details
+  """
   defmacro __using__(opts) do
     maybe_resolver =
       opts
       |> Keyword.get(:node_resolver, false)
       |> Macro.escape()
 
+    # If we pass the {__MODULE__, :resolver_name} as a tuple
+    # in opts elixir gets confused and thinks its an ast node
     resolver =
       case is_atom(maybe_resolver) do
         true ->
@@ -29,6 +53,15 @@ defmodule Stylex.ScssParser do
 
   def default_resolver(s, b, c), do: %{s: s, b: b, c: c}
 
+  @doc """
+  Parses scss string `str` into a node tree, completed nodes are passed to `node_resolver`
+  which can be either {module, function} or a function of arity 3
+
+  the `scss_parse/1` method added by `use`-ing this module injects the option
+  `:node_resolver` and the __CALLER__ as its second arg; however, macro's cannot
+  accept anonymous functions while this can:
+  """
+  @spec parse(String.t(), {atom(), atom()} | (term, list(), list() -> term())) :: term()
   def parse(str, node_resolver) do
     str_chars = to_charlist(str)
     transformer = fn c, acc -> to_node_tree(c, acc, node_resolver) end
@@ -185,8 +218,13 @@ defmodule Stylex.ScssParser do
 
     children = Enum.reject(c, &Kernel.==(&1, 32))
 
-    {module, function} = node_resolver
-    Kernel.apply(module, function, [selector, body, children])
+    case node_resolver do
+      {module, function} ->
+        Kernel.apply(module, function, [selector, body, children])
+
+      f when is_function(f, 3) ->
+        Kernel.apply(f, [selector, body, children])
+    end
   end
 
   defp close_node(node, _), do: node
