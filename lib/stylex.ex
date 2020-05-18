@@ -3,16 +3,8 @@ defmodule Stylex do
   Documentation for Stylex.
   """
 
-  @doc """
-  Hello world.
-
-  ## Examples
-
-      iex> Stylex.hello()
-      :world
-
-  """
-  def hello do
-    :world
+  defmacro __using__(opts) do
+    quote do
+    end
   end
 end

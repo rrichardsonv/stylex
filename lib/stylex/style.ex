@@ -83,19 +83,51 @@ defmodule Stylex.Style do
        )}
 
   def new(selector, [[_, _] | _] = body, children) do
-    body = Map.new(body, fn [prop, val] -> {prop, val} end)
+    hash =
+      body
+      |> Enum.map_join(";", fn [prop, val] -> "#{String.trim(prop)}:#{String.trim(val)}" end)
+      |> sha_hash()
+
+    body =
+      body
+      |> Map.new(fn [prop, val] -> {prop, val} end)
+      |> Map.put(:sha, hash)
+
     {:ok, %Style{selector: selector, children: children, body: body}}
   end
 
-  def new(selector, [{_, _} | _] = body, children),
-    do: {:ok, %Style{selector: selector, children: children, body: Map.new(body)}}
+  def new(selector, [{_, _} | _] = body, children) do
+    hash =
+      body
+      |> Enum.map_join(";", fn {prop, val} -> "#{String.trim(prop)}:#{String.trim(val)}" end)
+      |> sha_hash()
+
+    body =
+      body
+      |> Map.new(fn [prop, val] -> {prop, val} end)
+      |> Map.put(:sha, hash)
+
+    {:ok, %Style{selector: selector, children: children, body: body}}
+  end
 
   def new(selector, body, children) when is_list(body),
-    do: {:ok, %Style{selector: selector, children: children, body: []}}
+    do: {:ok, %Style{selector: selector, children: children, body: %{sha: sha_hash("")}}}
 
   def new(selector, body, children) when is_map(body),
     do: {:ok, %Style{selector: selector, children: children, body: body}}
 
+
+  def hash_tree(selector, body, children) do
+    case new(selector, body, children) do
+      {:ok, %Style{selector: selector, children: children, body: body}} ->
+        {selector, Map.fetch!(body, :sha), children}
+      {:error, _} ->
+        raise "FUCK"
+    end
+  end
+
+
+  defp sha_hash(s), do: :crypto.hash(:sha256, s)
   @doc """
   Converts an scss string to an `t:Stylex.Style.t/0` struct tree
   """
