@@ -118,10 +118,11 @@ defmodule Stylex.Parser.Utils do
         value = Keyword.fetch!(rule_props, :value)
         "#{prop}:#{value};"
       end)
-      |> Enum.reduce("", fn s, acc when is_binary(s) ->
-        s <> acc
-      end)
+      |> Enum.sort()
+      |> Enum.join("")
       |> case do
+        "" ->
+          ""
         s when is_binary(s) ->
           :sha256
           |> :crypto.hash(s)

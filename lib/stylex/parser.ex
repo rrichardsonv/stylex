@@ -9,6 +9,7 @@ defmodule Stylex.Parser do
       repeat(
         lookahead_not(open_curly())
         |> choice([
+          ignore(comment()),
           ascii_string([not: ?;, not: ?}, not: ?{, not: ?\n, not: ?\t, not: ?\s], min: 1),
           whitespace()
         ])
@@ -22,19 +23,42 @@ defmodule Stylex.Parser do
     |> ignore(close_curly())
   )
 
+  defcombinatorp(:with_interpolation,
+      ascii_string([not: ?;, not: ?:, not: ?}, not: ?{, not: ?\n], min: 1)
+      |> concat(string("#\{"))
+      |> concat(ascii_string([not: ?;, not: ?:, not: ?}, not: ?{, not: ?\n], min: 1))
+      |> concat(close_curly())
+      |> concat(ascii_string([not: ?;, not: ?:, not: ?}, not: ?{, not: ?\n], min: 1))
+  )
+
   defcombinatorp(:rule,
     optional(whitespace())
-    |> concat(unwrap_and_tag(ascii_string([not: ?;, not: ?:, not: ?}, not: ?{, not: ?\n], min: 1), :prop))
+    |> concat(unwrap_and_tag(choice([
+      ascii_string([not: ?;, not: ?:, not: ?}, not: ?{, not: ?\n], min: 1),
+      parsec(:with_interpolation)
+    ]), :prop))
     |> optional(whitespace())
     |> ignore(colon())
     |> optional(whitespace())
     |> concat(ascii_string([not: ?;], min: 1) |> unwrap_and_tag(:value))
+    |> optional(whitespace())
     |> ignore(semi())
+    |> optional(whitespace())
+  )
+
+  defcombinatorp(:at_rule,
+    optional(whitespace())
+    |> ignore(string("@"))
+    |> ascii_string([not: ?;, not: ?}, not: ?{, not: ?\n], min: 1)
+    |> optional(whitespace())
+    |> ignore(semi())
+    |> tag(:at_rule)
   )
 
   defcombinatorp(:root,
     choice([
       comment(),
+      parsec(:at_rule),
       parsec(:block)
       |> tag(:block)
       |> pre_traverse({Stylex.Parser.Utils, :start_length, []})
@@ -46,12 +70,21 @@ defmodule Stylex.Parser do
       whitespace(),
       space_chars(),
       non_control_char(),
-      colon() |> tag(:colon),
-      comma() |> tag(:comma),
-      open_curly() |> tag(:open_curly),
-      close_curly() |> tag(:close_curly),
+      colon() |> tag(:invariant),
+      semi() |> tag(:invariant),
+      comma() |> tag(:invariant),
+      open_curly() |> tag(:invariant),
+      close_curly() |> tag(:invariant),
     ])
+    |> post_traverse({:foo, []})
   )
+
+  def foo(rest, [{:invariant, _} | _] = a, c, _, _) do
+    _ = IO.inspect(String.slice(rest, 0..40), label: "invariant")
+    {a, c}
+  end
+
+  def foo(_, a, c, _, _), do: {a,c}
 
   defparsec(
     :parse,
