@@ -55,7 +55,7 @@ defmodule Stylex.Style do
   end
 
   @doc """
-  Creates and returns a `t:Stylex.Style.t/0` struct or raises on error. See Stylex.Style.new/3 for details
+  Creates and returns a `t:Stylex.Style.t/0` struct or raises on error. See `Stylex.Style.new/3` for details
   """
   def new!(selector, body, children) do
     case new(selector, body, children) do
